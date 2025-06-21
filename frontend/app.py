@@ -143,7 +143,7 @@ with st.sidebar:
 # =============================================================================
 # 5. 主聊天界面
 # =============================================================================
-st.title("多 Agent 框架对比平台 🚀")
+st.title("multi-Agent 测试平台 🚀")
 # 在标题下方显示当前用户的选择，非常直观
 st.caption(f"当前配置:  `{selected_framework}`  >  `{selected_agent_name}`  >  `{selected_model}`")
 
@@ -179,14 +179,7 @@ if prompt := st.chat_input("请输入您的问题或指令..."):
             chat_payload = {
                 "agent_name": selected_agent_name,  # 从侧边栏动态获取
                 "model": selected_model,
-                "user_prompt": prompt, # 将用户原始问题传给后端
-                "conversation_id": f"st_conv_{datetime.now().timestamp()}"
-            }
-
-            chat_payload = {
-                "agent_name": selected_agent_name,  # 从侧边栏动态获取
-                "model": selected_model,
-                "message": prompt, # 将用户原始问题传给后端
+                "message": st.session_state.messages[-10:], # 只保留最近的10条消息记录
                 "conversation_id": f"st_conv_{datetime.now().timestamp()}"
             }
             

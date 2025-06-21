@@ -30,7 +30,7 @@ class AgentRegistry:
         # prefix参数指定模块名称的前缀，这里使用agents包的完整名称作为前缀，确保导入的模块名称正确
         for module_info in pkgutil.walk_packages(path=agents.__path__, prefix=agents.__name__ + '.'):
             try:
-                print(f"\n📂 Found module: {module_info.name}")
+                # print(f"\n📂 Found module: {module_info.name}")
                 # 动态导入找到的模块
                 module = importlib.import_module(module_info.name)
                 
@@ -42,7 +42,7 @@ class AgentRegistry:
                     # 检查这个属性是否是一个类，是否是BaseAgent的子类，
                     # 并且不是BaseAgent本身，以避免加载基类
                     if isinstance(attribute, type) and issubclass(attribute, BaseAgent) and attribute is not BaseAgent:
-                        print(f"  Found agent class: {attribute.__name__}")
+                        # print(f"  Found agent class: {attribute.__name__}")
                         # 实例化Agent
                         agent_instance = attribute()
                         

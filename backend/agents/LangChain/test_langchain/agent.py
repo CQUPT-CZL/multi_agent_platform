@@ -29,18 +29,11 @@ class LangChainTestAgent(BaseAgent):
 
     async def run(self, message: str, model: str, conversation_id: str) -> str:
         try:
-            print("开始LangChain测试...")
             llm = ChatOpenAI(temperature=0, model="deepseek-chat")
             chain = llm | StrOutputParser()
-            print(1)
             result = await chain.ainvoke(message)
-            print(result)
             
-            return f"✅ LangChain测试成功！\n\n" \
-                   f"框架: {self.framework}\n" \
-                   f"模型: {model}\n" \
-                   f"会话ID: {conversation_id}\n\n" \
-                   f"结果: {result}"
+            return f"{result}"
                    
         except Exception as e:
             return f"❌ LangChain测试失败！\n\n" \

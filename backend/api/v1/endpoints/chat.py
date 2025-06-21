@@ -1,12 +1,13 @@
 # api/v1/endpoints/chat.py
 from fastapi import APIRouter, HTTPException
+from typing import List
 from pydantic import BaseModel
 from core.agent_registry import agent_registry # 导入我们的注册中心
 
 router = APIRouter()
 
 class ChatRequest(BaseModel):
-    message: str
+    message: List[dict]  # 消息列表，包含对话历史记录
     agent_name: str
     model: str # 从前端获取模型信息
     conversation_id: str

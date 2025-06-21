@@ -20,6 +20,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_community.tools.google_serper import GoogleSerperRun
 from langchain_community.utilities.google_serper import GoogleSerperAPIWrapper
 
+# 导入用于创建自定义工具的装饰器
+from langchain.tools import tool
+
 # 加载 .env 文件中的环境变量 (例如 OPENAI_API_KEY, SERPER_API_KEY)
 dotenv.load_dotenv()
 
@@ -27,6 +30,43 @@ dotenv.load_dotenv()
 if not os.getenv("SERPER_API_KEY"):
     print("⚠️ 警告: 环境变量 SERPER_API_KEY 未设置。搜索工具将无法工作。")
     print("   请访问 https://serper.dev/ 获取免费API密钥。")
+
+
+@tool
+def multiply_numbers(numbers: str) -> str:
+    """计算两个数字的乘积。输入格式应为包含两个数字的描述，例如 '计算25乘以37' 或 '25 * 37'。
+    
+    Args:
+        numbers: 包含两个要相乘数字的字符串描述
+        
+    Returns:
+        两个数字的乘积结果
+    """
+    import re
+    import json
+    
+    try:
+        # 尝试解析JSON格式的输入
+        if numbers.strip().startswith('{'):
+            data = json.loads(numbers)
+            if 'a' in data and 'b' in data:
+                a, b = float(data['a']), float(data['b'])
+                result = a * b
+                return f"计算结果: {a} × {b} = {result}"
+        
+        # 使用正则表达式提取数字
+        number_pattern = r'[-+]?\d*\.?\d+'
+        found_numbers = re.findall(number_pattern, numbers)
+        
+        if len(found_numbers) >= 2:
+            a, b = float(found_numbers[0]), float(found_numbers[1])
+            result = a * b
+            return f"计算结果: {a} × {b} = {result}"
+        else:
+            return "请提供两个数字进行乘法计算，例如：'计算25乘以37'或'25 * 37'"
+            
+    except Exception as e:
+        return f"计算出错: {str(e)}。请提供两个数字进行乘法计算。"
 
 
 class LangChainSearchAgent(BaseAgent):
@@ -51,7 +91,7 @@ class LangChainSearchAgent(BaseAgent):
 
     @property
     def description(self) -> str:
-        return "使用ReAct模式和Google Serper搜索引擎来回答问题。"
+        return "使用ReAct模式、Google Serper搜索引擎和数学计算工具来回答问题。"
 
     async def run(self, message: List[Dict[str, Any]], model: str, conversation_id: str) -> str:
         """
@@ -65,7 +105,10 @@ class LangChainSearchAgent(BaseAgent):
             # 2. 定义可用的工具列表
             # 【修正】需要先创建API Wrapper，再将其传入工具
             search_wrapper = GoogleSerperAPIWrapper()
-            tools = [GoogleSerperRun(api_wrapper=search_wrapper)]
+            tools = [
+                GoogleSerperRun(api_wrapper=search_wrapper),
+                multiply_numbers  # 添加乘法计算工具
+            ]
 
             # 3. 【核心改动】创建 ReAct 模式的 Prompt
             # ReAct 的 prompt 结构很特别，它需要明确定义工具、思考过程和最终答案的格式。
@@ -96,7 +139,9 @@ class LangChainSearchAgent(BaseAgent):
                 "chat_history": chat_history_messages
             })
 
-            return result.get("output", "抱歉，我无法处理您的请求。")
+            print(f"--- Agent Result: {result} ---")
+
+            return result.get("output", "抱歉，我无法处理您的请求。")[:-3]
 
         except Exception as e:
             import traceback

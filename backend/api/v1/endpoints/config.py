@@ -1,7 +1,7 @@
 # 文件路径: backend/api/v1/endpoints/config.py
 
 from fastapi import APIRouter
-from core.agent_registry import agent_registry # 假设注册中心在这里
+from core.agent_registry import agent_registry 
 
 # 为这个模块创建一个独立的 router 实例
 router = APIRouter()
@@ -16,6 +16,11 @@ def get_system_config():
         fw = agent_instance.framework
         if fw not in config_data:
             config_data[fw] = []
+        
+        # 打印当前agent实例的信息
+        print(f"Agent信息: 框架={fw}, 名称={agent_instance.name}, "
+              f"显示名称={agent_instance.display_name}, "
+              f"描述={agent_instance.description}")
         
         config_data[fw].append({
             "name": agent_instance.name,

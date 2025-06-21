@@ -29,7 +29,6 @@ async def handle_chat(request: ChatRequest):
             model=request.model,
             conversation_id=request.conversation_id
         )
-        print(response_content)
         return ChatResponse(response=response_content)
     except Exception as e:
         # 统一的错误处理

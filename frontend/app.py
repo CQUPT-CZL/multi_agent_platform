@@ -14,7 +14,7 @@ API_BASE_URL = "http://localhost:8000"
 # =============================================================================
 # 2. 后端数据获取与缓存
 # =============================================================================
-# @st.cache_data(ttl=300)  # 缓存5分钟，避免每次刷新都请求后端，提高性能
+@st.cache_data(ttl=300)  # 缓存5分钟，避免每次刷新都请求后端，提高性能
 def get_backend_config():
     """
     从后端获取并缓存框架和Agent的配置信息。
@@ -93,16 +93,26 @@ with st.sidebar:
     # 根据上一步选择的框架，动态地获取该框架下的所有可用 Agent
     agent_options_list = backend_config[selected_framework]
     
-    # 使用 format_func 来实现“显示友好名称，返回技术名称”的绝佳用户体验
+    # 使用 format_func 来实现"显示友好名称，返回技术名称"的绝佳用户体验
     # 这对于调用 API 至关重要，因为 API 需要的是唯一的技术名称 (name)
     selected_agent_name = st.selectbox(
         label="🎯 **第二步：选择具体 Agent (任务)**",
         options=[agent['name'] for agent in agent_options_list],  # 内部值是技术名称
-        format_func=lambda name: next(  # format_func 决定了选项如何显示出来
+        # 将技术名称(name)映射为显示名称(display_name)
+        format_func=lambda name: next(
+            # 遍历agent列表,找到匹配name的agent并返回其display_name
             (agent['display_name'] for agent in agent_options_list if agent['name'] == name),
-            name
+            # 如果找不到匹配的agent,则返回原始name作为后备选项
+            name  
         )
     )
+    
+    # 获取并显示当前选中Agent的描述信息
+    selected_agent_desc = next(
+        (agent['description'] for agent in agent_options_list if agent['name'] == selected_agent_name),
+        "暂无描述"  # 如果找不到描述信息，显示默认文本
+    )
+    st.markdown(f"📝 **Agent描述**:\n\n{selected_agent_desc}")
 
     # 3. 模型提供商和模型选择器
     # 这部分目前是硬编码的，但也可以改造成从后端动态获取

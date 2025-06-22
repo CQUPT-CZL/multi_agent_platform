@@ -156,6 +156,12 @@ with st.sidebar:
     if st.button("🔄 刷新配置", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    
+    # 清除聊天记录按钮
+    if st.button("🗑️ 清除聊天记录", use_container_width=True):
+        if "messages" in st.session_state:
+            del st.session_state.messages
+        st.rerun()
 
 
 # =============================================================================

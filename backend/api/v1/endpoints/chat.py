@@ -1,4 +1,7 @@
 # api/v1/endpoints/chat.py
+import agentops
+import os
+
 from fastapi import APIRouter, HTTPException
 from typing import List
 from pydantic import BaseModel
@@ -17,11 +20,17 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat", response_model=ChatResponse)
 async def handle_chat(request: ChatRequest):
+
     agent = agent_registry.get_agent(request.agent_name)
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent '{request.agent_name}' not found.")
     
     try:
+        # 初始化AgentOps
+        agentops.init(
+            api_key=os.getenv("AGENTOPS_API_KEY"),
+            default_tags=[request.agent_name]
+        )
         print(f"开始执行Agent: {request.agent_name}...")
         # 调用统一的run接口，传入所需参数
         response_content = await agent.run(
@@ -29,6 +38,7 @@ async def handle_chat(request: ChatRequest):
             model=request.model,
             conversation_id=request.conversation_id
         )
+        agentops.end_trace()
         return ChatResponse(response=response_content)
     except Exception as e:
         # 统一的错误处理

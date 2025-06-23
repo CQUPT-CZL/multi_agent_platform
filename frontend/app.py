@@ -359,7 +359,7 @@ with st.sidebar:
             for tool_name in list(pending_config.keys()):
                 col1, col2 = st.columns([8, 2])
                 col1.markdown(f"- **{tool_name}**")
-                if col2.button("删除", key=f"delete_{tool_name}"):
+                if col2.button("🗑️", key=f"delete_{tool_name}", help="删除", use_container_width=True):
                     # 从pending配置中删除工具(不立即应用)
                     del st.session_state.pending_mcp_config[tool_name]
                     st.success(

@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Dict, Any
 from agents.base_agent import BaseAgent
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -21,11 +22,32 @@ class LangGraphMCPAgent(BaseAgent):
 
     @property
     def display_name(self) -> str:
-        return "多工具协作Agent (LangGraph)"
+        return "多工具协作Agent，支持插拔式MCP。"
 
     @property
     def description(self) -> str:
         return "使用 LangGraph 和 MCP Client 与数学和天气等多个工具进行交互。"
+
+    def _load_mcp_config(self) -> Dict[str, Any]:
+        """
+        从 config.json 文件加载 MCP 配置
+        """
+        try:
+            # 获取项目根目录下的 frontend/config.json 路径
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+            config_path = os.path.join(project_root, "frontend", "config.json")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                print(f"✅ 成功从 {config_path} 加载 MCP 配置")
+                return config
+            else:
+                print(f"⚠️ 配置文件不存在: {config_path}，使用默认配置")
+                return {}
+        except Exception as e:
+            print(f"❌ 加载 MCP 配置失败: {e}，使用默认配置")
+            return {}
 
     async def run(self, message: List[Dict[str, Any]], model: str, conversation_id: str) -> str:
         """
@@ -36,24 +58,16 @@ class LangGraphMCPAgent(BaseAgent):
         try:
             user_question = message[-1]["content"]
 
-            # 获取当前项目根目录
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-            # math_server_path = os.path.join(project_root, "mcp_server", "math_server.py")
+            # 从 config.json 加载 MCP 配置
+            mcp_config = self._load_mcp_config()
+            
+            if not mcp_config:
+                return "❌ 没有找到有效的 MCP 配置，请在前端界面配置 MCP 工具后再试。"
+            
+            print(f"📋 当前 MCP 配置: {list(mcp_config.keys())}")
+            print(f"📋 当前 MCP 配置: {mcp_config}")
 
-            client = MultiServerMCPClient(
-                {
-                    # "math": {
-                    #     "command": "python",
-                    #     "args": [math_server_path],
-                    #     "transport": "stdio",
-                    # },
-                    "weather": {
-                        # 确保 weather_server 在 8000 端口上运行
-                        "url": "http://localhost:8005/mcp/",
-                        "transport": "streamable_http",
-                    }
-                }
-            )
+            client = MultiServerMCPClient(mcp_config)
 
             tools = await client.get_tools()
             print(tools)

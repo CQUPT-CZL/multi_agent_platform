@@ -21,11 +21,10 @@ def load_config_from_json():
         dict: Loaded settings
     """
     default_config = {
-        "get_current_time": {
-            "command": "python",
-            "args": ["./mcp_server_time.py"],
-            "transport": "stdio"
-        }
+        "weather": {
+                "url": "http://localhost:8000/mcp/",
+                "transport": "sse"
+            }
     }
     
     try:
@@ -237,17 +236,9 @@ with st.sidebar:
         
         # 提供示例
         example_json = {
-            "github": {
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "@smithery/cli@latest",
-                    "run",
-                    "@smithery-ai/github",
-                    "--config",
-                    '{"githubPersonalAccessToken":"your_token_here"}',
-                ],
-                "transport": "stdio",
+            "weather": {
+                "url": "http://localhost:8005/mcp/",
+                "transport": "streamable_http"
             }
         }
         
@@ -295,9 +286,9 @@ with st.sidebar:
                             # 检查URL字段并设置transport
                             if "url" in tool_config:
                                 # 如果存在URL，设置transport为"sse"
-                                tool_config["transport"] = "sse"
+                                tool_config["transport"] = "streamable_http"
                                 st.info(
-                                    f"在'{tool_name}'工具中检测到URL，设置transport为'sse'。"
+                                    f"在'{tool_name}'工具中检测到URL，设置transport为'streamable_http'。"
                                 )
                             elif "transport" not in tool_config:
                                 # 如果不存在URL且未指定transport，设置默认"stdio"
@@ -431,10 +422,9 @@ with st.sidebar:
     if st.button("🔧 重置MCP配置", use_container_width=True):
         # 重置为默认配置
         default_config = {
-            "get_current_time": {
-                "command": "python",
-                "args": ["./mcp_server_time.py"],
-                "transport": "stdio"
+            "weather": {
+                "url": "http://localhost:8005/mcp/",
+                "transport": "streamable_http"
             }
         }
         st.session_state.pending_mcp_config = default_config.copy()

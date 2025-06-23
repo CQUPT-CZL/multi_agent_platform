@@ -2,6 +2,63 @@
 import streamlit as st
 import requests
 from datetime import datetime
+import json
+import os
+
+# =============================================================================
+# 0. MCP配置管理
+# =============================================================================
+# config.json file path setting
+CONFIG_FILE_PATH = "config.json"
+
+# Function to load settings from JSON file
+def load_config_from_json():
+    """
+    Loads settings from config.json file.
+    Creates a file with default settings if it doesn't exist.
+
+    Returns:
+        dict: Loaded settings
+    """
+    default_config = {
+        "get_current_time": {
+            "command": "python",
+            "args": ["./mcp_server_time.py"],
+            "transport": "stdio"
+        }
+    }
+    
+    try:
+        if os.path.exists(CONFIG_FILE_PATH):
+            with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            # Create file with default settings if it doesn't exist
+            save_config_to_json(default_config)
+            return default_config
+    except Exception as e:
+        st.error(f"Error loading settings file: {str(e)}")
+        return default_config
+
+# Function to save settings to JSON file
+def save_config_to_json(config):
+    """
+    Saves settings to config.json file.
+
+    Args:
+        config (dict): Settings to save
+    
+    Returns:
+        bool: Save success status
+    """
+    try:
+        with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving settings file: {str(e)}")
+        return False
+
 
 # =============================================================================
 # 1. 后端 API 配置
@@ -48,14 +105,24 @@ def get_backend_config():
 
 
 # =============================================================================
-# 3. 页面基础设置
+# 3. 页面基础设置和Session State初始化
 # =============================================================================
 # 配置浏览器标签页的标题、图标和页面布局
 st.set_page_config(
     page_title="多 Agent 框架对比平台",
-    page_icon="�",
+    page_icon="🤖",
     layout="wide"
 )
+
+# 初始化MCP配置相关的session state
+if "mcp_config_initialized" not in st.session_state:
+    st.session_state.mcp_config_initialized = False
+    st.session_state.mcp_tools_expander = False
+    # 加载现有配置作为pending配置
+    loaded_config = load_config_from_json()
+    st.session_state.pending_mcp_config = loaded_config.copy()
+    st.session_state.current_mcp_config = loaded_config.copy()
+    st.session_state.mcp_config_initialized = True
 
 
 # =============================================================================
@@ -99,6 +166,7 @@ with st.sidebar:
 
     # ---- 动态生成选择器 ----
 
+    st.subheader("🤖 Agent配置")
     # 1. Agent框架选择器
     # 选项的 keys 直接来自后端返回的 JSON 数据
     framework_options = list(backend_config.keys())
@@ -136,21 +204,217 @@ with st.sidebar:
     # 这部分目前是硬编码的，但也可以改造成从后端动态获取
     model_provider = st.selectbox(
         label="🧠 **第三步：选择模型提供商**",
-        options=["OpenAI", "Google", "Anthropic", "本地模型"],
+        options=["DeepSeek", "本地模型"],
         help="模型的性能会直接影响 Agent 的表现。"
     )
     models = {
-        "OpenAI": ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
-        "Google": ["gemini-1.5-pro", "gemini-1.0-pro"],
-        "Anthropic": ["claude-3-opus", "claude-3-sonnet"],
+        "DeepSeek": ["deepseek-chat"],
         "本地模型": ["llama3-70b-instruct", "mistral-large"]
     }
     selected_model = st.selectbox(
         label="⚙️ **第四步：选择具体模型**",
         options=models[model_provider]
     )
+
+    st.markdown("---")
+    
+
+    
+    # =============================================================================
+    # MCP工具配置部分
+    # =============================================================================
+    st.subheader("🔧 MCP工具配置")
+    
+    # MCP工具添加界面
+    with st.expander("🧰 添加MCP工具", expanded=st.session_state.mcp_tools_expander):
+        st.markdown(
+            """
+        请以JSON格式插入**一个工具**。
+        
+        ⚠️ **重要**: JSON必须用大括号(`{}`)包装。
+        """
+        )
+        
+        # 提供示例
+        example_json = {
+            "github": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@smithery/cli@latest",
+                    "run",
+                    "@smithery-ai/github",
+                    "--config",
+                    '{"githubPersonalAccessToken":"your_token_here"}',
+                ],
+                "transport": "stdio",
+            }
+        }
+        
+        default_text = json.dumps(example_json, indent=2, ensure_ascii=False)
+        
+        new_tool_json = st.text_area(
+            "工具JSON配置",
+            default_text,
+            height=200,
+        )
+        
+        # 添加工具按钮
+        if st.button(
+            "添加工具",
+            type="primary",
+            key="add_tool_button",
+            use_container_width=True,
+        ):
+            try:
+                # 验证输入
+                if not new_tool_json.strip().startswith(
+                    "{"
+                ) or not new_tool_json.strip().endswith("}"):
+                    st.error("JSON必须以大括号开始和结束({})。")
+                    st.markdown('正确格式: `{ "tool_name": { ... } }`')
+                else:
+                    # 解析JSON
+                    parsed_tool = json.loads(new_tool_json)
+                    
+                    # 检查是否为mcpServers格式并相应处理
+                    if "mcpServers" in parsed_tool:
+                        # 将mcpServers的内容移到顶层
+                        parsed_tool = parsed_tool["mcpServers"]
+                        st.info(
+                            "检测到'mcpServers'格式。自动转换中。"
+                        )
+                    
+                    # 检查输入的工具数量
+                    if len(parsed_tool) == 0:
+                        st.error("请至少输入一个工具。")
+                    else:
+                        # 处理所有工具
+                        success_tools = []
+                        for tool_name, tool_config in parsed_tool.items():
+                            # 检查URL字段并设置transport
+                            if "url" in tool_config:
+                                # 如果存在URL，设置transport为"sse"
+                                tool_config["transport"] = "sse"
+                                st.info(
+                                    f"在'{tool_name}'工具中检测到URL，设置transport为'sse'。"
+                                )
+                            elif "transport" not in tool_config:
+                                # 如果不存在URL且未指定transport，设置默认"stdio"
+                                tool_config["transport"] = "stdio"
+                            
+                            # 检查必需字段
+                            if (
+                                "command" not in tool_config
+                                and "url" not in tool_config
+                            ):
+                                st.error(
+                                    f"'{tool_name}'工具配置需要'command'或'url'字段。"
+                                )
+                            elif "command" in tool_config and "args" not in tool_config:
+                                st.error(
+                                    f"'{tool_name}'工具配置需要'args'字段。"
+                                )
+                            elif "command" in tool_config and not isinstance(
+                                tool_config["args"], list
+                            ):
+                                st.error(
+                                    f"'{tool_name}'工具中的'args'字段必须是数组([])格式。"
+                                )
+                            else:
+                                # 添加工具到pending_mcp_config
+                                st.session_state.pending_mcp_config[tool_name] = (
+                                    tool_config
+                                )
+                                success_tools.append(tool_name)
+                        
+                        # 成功消息
+                        if success_tools:
+                            if len(success_tools) == 1:
+                                st.success(
+                                    f"{success_tools[0]}工具已添加。点击'应用设置'按钮以应用。"
+                                )
+                            else:
+                                tool_names = ", ".join(success_tools)
+                                st.success(
+                                    f"总共{len(success_tools)}个工具({tool_names})已添加。点击'应用设置'按钮以应用。"
+                                )
+                            # 添加后折叠expander
+                            st.session_state.mcp_tools_expander = False
+                            st.rerun()
+                            
+            except json.JSONDecodeError as e:
+                st.error(f"JSON解析错误: {e}")
+                st.markdown(
+                    f"""
+                **如何修复**:
+                1. 检查您的JSON格式是否正确。
+                2. 所有键必须用双引号(")包装。
+                3. 字符串值也必须用双引号(")包装。
+                4. 在字符串中使用双引号时，必须转义(\\)。
+                """
+                )
+            except Exception as e:
+                st.error(f"发生错误: {e}")
+    
+    # 显示已注册工具列表并添加删除按钮
+    with st.expander("📋 已注册工具列表", expanded=True):
+        try:
+            pending_config = st.session_state.pending_mcp_config
+        except Exception as e:
+            st.error("不是有效的MCP工具配置。")
+        else:
+            # 遍历pending配置中的键(工具名称)
+            for tool_name in list(pending_config.keys()):
+                col1, col2 = st.columns([8, 2])
+                col1.markdown(f"- **{tool_name}**")
+                if col2.button("删除", key=f"delete_{tool_name}"):
+                    # 从pending配置中删除工具(不立即应用)
+                    del st.session_state.pending_mcp_config[tool_name]
+                    st.success(
+                        f"{tool_name}工具已删除。点击'应用设置'按钮以应用。"
+                    )
+                    st.rerun()
+    
+    # 应用设置按钮
+    if st.button(
+        "应用设置",
+        key="apply_button",
+        type="primary",
+        use_container_width=True,
+    ):
+        # 显示应用消息
+        apply_status = st.empty()
+        with apply_status.container():
+            st.warning("🔄 正在应用更改。请稍候...")
+            progress_bar = st.progress(0)
+            
+            # 保存设置到config.json文件
+            save_result = save_config_to_json(st.session_state.pending_mcp_config)
+            if save_result:
+                st.session_state.current_mcp_config = st.session_state.pending_mcp_config.copy()
+                progress_bar.progress(50)
+                st.success("✅ 新设置已应用并保存到config.json。")
+                # 折叠工具添加expander
+                if "mcp_tools_expander" in st.session_state:
+                    st.session_state.mcp_tools_expander = False
+            else:
+                st.error("❌ 保存设置文件失败。")
+            
+            progress_bar.progress(100)
+        
+        # 刷新页面
+        st.rerun()
     
     st.markdown("---")
+    
+    # =============================================================================
+    # 系统信息显示
+    # =============================================================================
+    # =============================================================================
+    # 操作按钮
+    # =============================================================================
+    st.subheader("🔄 操作")
     
     # 刷新按钮，用于清除缓存并重新从后端拉取配置
     if st.button("🔄 刷新配置", use_container_width=True):
@@ -162,6 +426,22 @@ with st.sidebar:
         if "messages" in st.session_state:
             del st.session_state.messages
         st.rerun()
+    
+    # 重置MCP配置按钮
+    if st.button("🔧 重置MCP配置", use_container_width=True):
+        # 重置为默认配置
+        default_config = {
+            "get_current_time": {
+                "command": "python",
+                "args": ["./mcp_server_time.py"],
+                "transport": "stdio"
+            }
+        }
+        st.session_state.pending_mcp_config = default_config.copy()
+        st.session_state.current_mcp_config = default_config.copy()
+        save_config_to_json(default_config)
+        st.success("✅ MCP配置已重置为默认设置")
+        st.rerun()
 
 
 # =============================================================================
@@ -169,7 +449,8 @@ with st.sidebar:
 # =============================================================================
 st.title("multi-Agent 测试平台 🚀")
 # 在标题下方显示当前用户的选择，非常直观
-st.caption(f"当前配置:  `{selected_framework}`  >  `{selected_agent_name}`  >  `{selected_model}`")
+mcp_tool_count = len(st.session_state.current_mcp_config) if "current_mcp_config" in st.session_state else 0
+st.caption(f"当前配置:  `{selected_framework}`  >  `{selected_agent_name}`  >  `{selected_model}`  |  🔧 MCP工具: {mcp_tool_count}个")
 
 # ---- 核心聊天逻辑 ----
 

@@ -2,5 +2,9 @@
   "weather": {
     "url": "http://localhost:8005/mcp/",
     "transport": "streamable_http"
+  },
+  "search": {
+    "url": "http://localhost:8006/mcp/",
+    "transport": "streamable_http"
   }
 }

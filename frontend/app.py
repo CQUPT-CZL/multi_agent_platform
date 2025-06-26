@@ -125,6 +125,12 @@ if check_login_required():
     else:
         # 用户已登录，在侧边栏显示用户信息
         render_user_info()
+        
+        # 初始化会话管理
+        if "current_session_id" not in st.session_state:
+            st.session_state.current_session_id = None
+        if "session_messages" not in st.session_state:
+            st.session_state.session_messages = []
 
 # 初始化MCP配置相关的session state
 if "mcp_config_initialized" not in st.session_state:
@@ -143,6 +149,8 @@ if "mcp_config_initialized" not in st.session_state:
 # 使用 'with' 语句将所有元素放入侧边栏
 with st.sidebar:
     st.title("🛠️ 配置中心")
+    
+    st.markdown("---")
     
     # 调用函数获取后端配置
     config_ok, backend_config = get_backend_config()
@@ -229,8 +237,6 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    
-
     
     # =============================================================================
     # MCP工具配置部分
@@ -412,6 +418,82 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # 历史会话管理（仅在用户登录时显示）
+    if check_login_required() and check_authentication():
+        st.subheader("💬 会话管理")
+        
+        # 获取当前用户名和认证管理器
+        username = st.session_state.get("username")
+        auth_manager = st.session_state.get("auth_manager")
+        
+        if username and auth_manager:
+            # 新建会话按钮
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if st.button("🆕 新建会话", use_container_width=True):
+                    # 创建新会话
+                    new_session_id = auth_manager.create_chat_session(username)
+                    if new_session_id:
+                        st.session_state.current_session_id = new_session_id
+                        st.session_state.session_messages = []
+                        st.session_state.messages = [
+                            {"role": "assistant", "content": "您好！请在左侧配置好您想测试的组合，然后在这里向我提问吧！"}
+                        ]
+                        st.rerun()
+            
+            with col2:
+                if st.button("🔄", help="刷新会话列表", use_container_width=True):
+                    st.rerun()
+            
+            # 获取用户的会话列表
+            sessions = auth_manager.get_user_chat_sessions(username, limit=10)
+            
+            if sessions:
+                st.markdown("**历史会话:**")
+                for session in sessions:
+                    session_id = session["session_id"]
+                    title = session["title"]
+                    updated_at = session["updated_at"]
+                    
+                    # 格式化时间显示
+                    time_str = updated_at.strftime("%m-%d %H:%M")
+                    
+                    # 会话选择按钮
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        # 当前会话高亮显示
+                        button_type = "primary" if session_id == st.session_state.current_session_id else "secondary"
+                        if st.button(f"📝 {title}", key=f"session_{session_id}", 
+                                   help=f"更新时间: {time_str}", use_container_width=True, type=button_type):
+                            # 加载选中的会话
+                            session_data = auth_manager.get_chat_session(session_id, username)
+                            if session_data:
+                                st.session_state.current_session_id = session_id
+                                # 将数据库中的消息转换为streamlit格式
+                                messages = [{"role": msg["role"], "content": msg["content"]} 
+                                           for msg in session_data.get("messages", [])]
+                                if not messages:
+                                    messages = [
+                                        {"role": "assistant", "content": "您好！请在左侧配置好您想测试的组合，然后在这里向我提问吧！"}
+                                    ]
+                                st.session_state.messages = messages
+                                st.rerun()
+                    
+                    with col2:
+                        if st.button("🗑️", key=f"delete_{session_id}", help="删除会话", use_container_width=True):
+                            if auth_manager.delete_chat_session(session_id, username):
+                                if session_id == st.session_state.current_session_id:
+                                    st.session_state.current_session_id = None
+                                    st.session_state.messages = [
+                                        {"role": "assistant", "content": "您好！请在左侧配置好您想测试的组合，然后在这里向我提问吧！"}
+                                    ]
+                                st.success("会话已删除")
+                                st.rerun()
+            else:
+                st.info("暂无历史会话")
+        
+        st.markdown("---")
+    
     # =============================================================================
     # 系统信息显示
     # =============================================================================
@@ -437,7 +519,7 @@ with st.sidebar:
         default_config = {
             "weather": {
                 "url": "http://localhost:8005/mcp/",
-                "transport": "streamable_http"
+                "transport": "streamable-http"
             }
         }
         st.session_state.pending_mcp_config = default_config.copy()
@@ -471,14 +553,44 @@ for message in st.session_state.messages:
 
 # 接收用户的新输入
 if prompt := st.chat_input("请输入您的问题或指令..."):
+    # 确保有当前会话（如果用户登录了）
+    if check_login_required() and check_authentication():
+        username = st.session_state.get("username")
+        auth_manager = st.session_state.get("auth_manager")
+        
+        # 如果没有当前会话，创建一个新会话
+        if not st.session_state.current_session_id and username and auth_manager:
+            new_session_id = auth_manager.create_chat_session(username)
+            if new_session_id:
+                st.session_state.current_session_id = new_session_id
+    
     # 1. 将用户的输入添加到聊天记录并显示
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
+    
+    # 保存用户消息到数据库
+    if (check_login_required() and check_authentication() and 
+        st.session_state.current_session_id and 
+        st.session_state.get("auth_manager")):
+        
+        auth_manager = st.session_state.auth_manager
+        agent_config = {
+            "framework": selected_framework,
+            "agent_name": selected_agent_name,
+            "model": selected_model
+        }
+        
+        auth_manager.save_message_to_session(
+            st.session_state.current_session_id,
+            "user",
+            prompt,
+            agent_config
+        )
 
     # 2. 调用后端 API 并显示 Agent 的响应
     with st.chat_message("assistant"):
-        # 使用一个占位符，可以先显示“思考中”，然后用真实响应覆盖它
+        # 使用一个占位符，可以先显示"思考中"，然后用真实响应覆盖它
         message_placeholder = st.empty()
         message_placeholder.markdown("🧠 Agent 正在思考中，请稍候...")
         
@@ -488,7 +600,7 @@ if prompt := st.chat_input("请输入您的问题或指令..."):
                 "agent_name": selected_agent_name,  # 从侧边栏动态获取
                 "model": selected_model,
                 "message": st.session_state.messages[-10:], # 只保留最近的10条消息记录
-                "conversation_id": f"st_conv_{datetime.now().timestamp()}"
+                "conversation_id": st.session_state.current_session_id or f"st_conv_{datetime.now().timestamp()}"
             }
             
             # 发送 POST 请求
@@ -512,3 +624,15 @@ if prompt := st.chat_input("请输入您的问题或指令..."):
         
         # 3. 将 Agent 的完整响应也添加到聊天记录中
         st.session_state.messages.append({"role": "assistant", "content": agent_response})
+        
+        # 保存助手响应到数据库
+        if (check_login_required() and check_authentication() and 
+            st.session_state.current_session_id and 
+            st.session_state.get("auth_manager")):
+            
+            auth_manager = st.session_state.auth_manager
+            auth_manager.save_message_to_session(
+                st.session_state.current_session_id,
+                "assistant",
+                agent_response
+            )

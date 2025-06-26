@@ -33,6 +33,14 @@ class AuthManager:
             # 创建用户名唯一索引
             self.users_collection.create_index("username", unique=True)
             print(f"✅ 集合 {self.collection_name} 已创建或已存在")
+            
+            # 初始化聊天历史集合
+            self.chat_sessions_collection = self.db["chat_sessions"]
+            # 创建索引以提高查询性能
+            self.chat_sessions_collection.create_index([("username", 1), ("created_at", -1)])
+            self.chat_sessions_collection.create_index("session_id", unique=True)
+            print(f"✅ 聊天会话集合已初始化")
+            
         except Exception as e:
             st.error(f"❌ MongoDB连接失败: {str(e)}")
             self.client = None
@@ -157,6 +165,133 @@ class AuthManager:
             return user
         except Exception:
             return None
+    
+    def create_chat_session(self, username: str, title: str = None) -> str:
+        """创建新的聊天会话"""
+        if not self.client:
+            return None
+        
+        try:
+            from datetime import datetime
+            import uuid
+            
+            session_id = str(uuid.uuid4())
+            session_data = {
+                "session_id": session_id,
+                "username": username,
+                "title": title or f"会话 {datetime.now().strftime('%m-%d %H:%M')}",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "messages": [],
+                "agent_config": {
+                    "framework": None,
+                    "agent_name": None,
+                    "model": None
+                }
+            }
+            
+            self.chat_sessions_collection.insert_one(session_data)
+            return session_id
+        except Exception as e:
+            print(f"创建会话失败: {str(e)}")
+            return None
+    
+    def save_message_to_session(self, session_id: str, role: str, content: str, 
+                               agent_config: Dict[str, str] = None) -> bool:
+        """保存消息到会话"""
+        if not self.client:
+            return False
+        
+        try:
+            from datetime import datetime
+            
+            message_data = {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.utcnow()
+            }
+            
+            update_data = {
+                "$push": {"messages": message_data},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+            
+            # 如果提供了agent配置，也更新配置信息
+            if agent_config:
+                update_data["$set"]["agent_config"] = agent_config
+            
+            result = self.chat_sessions_collection.update_one(
+                {"session_id": session_id},
+                update_data
+            )
+            
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"保存消息失败: {str(e)}")
+            return False
+    
+    def get_user_chat_sessions(self, username: str, limit: int = 20) -> list:
+        """获取用户的聊天会话列表"""
+        if not self.client:
+            return []
+        
+        try:
+            sessions = list(self.chat_sessions_collection.find(
+                {"username": username},
+                {"messages": 0}  # 不返回消息内容，只返回会话基本信息
+            ).sort("updated_at", -1).limit(limit))
+            
+            return sessions
+        except Exception as e:
+            print(f"获取会话列表失败: {str(e)}")
+            return []
+    
+    def get_chat_session(self, session_id: str, username: str) -> Optional[Dict[str, Any]]:
+        """获取特定的聊天会话"""
+        if not self.client:
+            return None
+        
+        try:
+            session = self.chat_sessions_collection.find_one({
+                "session_id": session_id,
+                "username": username
+            })
+            return session
+        except Exception as e:
+            print(f"获取会话失败: {str(e)}")
+            return None
+    
+    def delete_chat_session(self, session_id: str, username: str) -> bool:
+        """删除聊天会话"""
+        if not self.client:
+            return False
+        
+        try:
+            result = self.chat_sessions_collection.delete_one({
+                "session_id": session_id,
+                "username": username
+            })
+            return result.deleted_count > 0
+        except Exception as e:
+            print(f"删除会话失败: {str(e)}")
+            return False
+    
+    def update_session_title(self, session_id: str, username: str, new_title: str) -> bool:
+        """更新会话标题"""
+        if not self.client:
+            return False
+        
+        try:
+            from datetime import datetime
+            
+            result = self.chat_sessions_collection.update_one(
+                {"session_id": session_id, "username": username},
+                {"$set": {"title": new_title, "updated_at": datetime.utcnow()}}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"更新会话标题失败: {str(e)}")
+            return False
 
 
 def check_login_required() -> bool:

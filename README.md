@@ -4,7 +4,7 @@
   <img src="logo.png" alt="AgentArena Logo">
 </div>
 
-[![Made with ❤️](https://img.shields.io/badge/Made%20with-❤️-red.svg)](https://github.com/yourusername/multi_agent_platform) [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://python.org) [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com) [![Streamlit](https://img.shields.io/badge/Streamlit-Latest-red.svg)](https://streamlit.io)
+[![Made with ❤️](https://img.shields.io/badge/Made%20with-❤️-red.svg)](https://github.com/CQUPT-CZL/multi_agent_platform) [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://python.org) [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com) [![Streamlit](https://img.shields.io/badge/Streamlit-Latest-red.svg)](https://streamlit.io)
 
 
 一个功能强大的多Agent框架对比和测试平台，支持主流AI Agent框架的统一管理、测试和对比。

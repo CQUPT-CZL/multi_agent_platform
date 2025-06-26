@@ -4,6 +4,7 @@ import requests
 from datetime import datetime
 import json
 import os
+from auth import check_authentication, render_login_page, render_user_info, check_login_required
 
 # =============================================================================
 # 0. MCP配置管理
@@ -22,8 +23,8 @@ def load_config_from_json():
     """
     default_config = {
         "weather": {
-                "url": "http://localhost:8000/mcp/",
-                "transport": "sse"
+                "url": "http://localhost:8005/mcp/",
+                "transport": "streamable-http"
             }
     }
     
@@ -112,6 +113,18 @@ st.set_page_config(
     page_icon="🤖",
     layout="wide"
 )
+
+# =============================================================================
+# 用户认证检查
+# =============================================================================
+# 检查是否需要登录以及用户认证状态
+if check_login_required():
+    if not check_authentication():
+        render_login_page()
+        st.stop()  # 阻止页面继续渲染
+    else:
+        # 用户已登录，在侧边栏显示用户信息
+        render_user_info()
 
 # 初始化MCP配置相关的session state
 if "mcp_config_initialized" not in st.session_state:

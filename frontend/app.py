@@ -428,19 +428,21 @@ with st.sidebar:
         
         if username and auth_manager:
             # 新建会话按钮
+            if st.button("🆕 新建会话", use_container_width=True):
+                # 创建新会话
+                new_session_id = auth_manager.create_chat_session(username)
+                if new_session_id:
+                    st.session_state.current_session_id = new_session_id
+                    st.session_state.session_messages = []
+                    st.session_state.messages = [
+                        {"role": "assistant", "content": "您好！请在左侧配置好您想测试的组合，然后在这里向我提问吧！"}
+                    ]
+                    st.rerun()
+            
+            # 刷新按钮和历史会话标题
             col1, col2 = st.columns([3, 1])
             with col1:
-                if st.button("🆕 新建会话", use_container_width=True):
-                    # 创建新会话
-                    new_session_id = auth_manager.create_chat_session(username)
-                    if new_session_id:
-                        st.session_state.current_session_id = new_session_id
-                        st.session_state.session_messages = []
-                        st.session_state.messages = [
-                            {"role": "assistant", "content": "您好！请在左侧配置好您想测试的组合，然后在这里向我提问吧！"}
-                        ]
-                        st.rerun()
-            
+                st.markdown("**历史会话:**")
             with col2:
                 if st.button("🔄", help="刷新会话列表", use_container_width=True):
                     st.rerun()
@@ -449,7 +451,6 @@ with st.sidebar:
             sessions = auth_manager.get_user_chat_sessions(username, limit=10)
             
             if sessions:
-                st.markdown("**历史会话:**")
                 for session in sessions:
                     session_id = session["session_id"]
                     title = session["title"]

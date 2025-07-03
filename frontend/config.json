@@ -1,10 +1,6 @@
 {
-  "weather": {
-    "url": "http://localhost:8005/mcp/",
-    "transport": "streamable_http"
-  },
-  "search": {
-    "url": "http://localhost:8006/mcp/",
+  "rag": {
+    "url": "http://113.249.91.68:5903/mcp/",
     "transport": "streamable_http"
   }
 }

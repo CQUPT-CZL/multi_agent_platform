@@ -3,7 +3,7 @@ set -e
 
 # --- 自定义配置 ---
 PROJECT_DIR="/home/czl/project/multi_agent_platform" # ‼️【已更新】项目绝对路径
-GIT_BRANCH="main"
+GIT_BRANCH="master"
 VENV_PATH="$PROJECT_DIR/.venv"
 ECOSYSTEM_FILE="$PROJECT_DIR/ecosystem.config.js" # ‼️【已更新】配置文件的绝对路径
 UV_PATH="/home/czl/.local/bin/uv"

@@ -17,6 +17,12 @@ FRONTEND_APP_NAME="multi-agent-frontend"
 # uv命令的绝对路径 (通过 which uv 命令查找)
 UV_PATH="/home/czl/.local/bin/uv"
 
+# ‼️【新增】日志文件路径
+LOG_FILE="$PROJECT_DIR/deploy.log"
+
+# ‼️【新增】将所有输出（标准输出和错误输出）都追加到日志文件中
+exec &> >(tee -a "$LOG_FILE")
+
 # --- 部署流程 ---
 echo "===== 开始部署: $(date) ====="
 

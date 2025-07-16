@@ -69,8 +69,23 @@ class LangGraphReactAgent(BaseAgent):
             
             print(f"📋 当前 MCP 配置: {list(mcp_config.keys())}")
             client = MultiServerMCPClient(mcp_config)
-            tools = await client.get_tools()
-            print(f"🛠️ Agent 可用工具: {[tool.name for tool in tools]}")
+            all_tools = await client.get_tools()
+            
+            # 🔧 工具过滤：定义你想要使用的工具列表
+            # 你可以在这里添加或移除工具名称来控制 Agent 可以使用哪些工具
+            allowed_tools = ["retrieve_and_rerank", "get_result"]  # 只允许这些工具
+            # 如果你想排除特定工具，可以使用这种方式：
+            # excluded_tools = ["unwanted_tool1", "unwanted_tool2"]
+            # tools = [tool for tool in all_tools if tool.name not in excluded_tools]
+            
+            # 过滤工具：只保留允许的工具
+            tools = [tool for tool in all_tools if tool.name in allowed_tools]
+            
+            print(f"🛠️ 所有可用工具: {[tool.name for tool in all_tools]}")
+            print(f"✅ 过滤后的工具: {[tool.name for tool in tools]}")
+            
+            if not tools:
+                return "⚠️ 没有可用的工具！请检查工具过滤配置或 MCP 服务状态。"
             
             # 2. 初始化 LLM
             llm = ChatOpenAI(model_name=os.getenv("MODEL", model), temperature=0)
@@ -84,17 +99,24 @@ class LangGraphReactAgent(BaseAgent):
             1.  **思考**: 在每一步，你都必须先进行思考（Thought）。分析当前情况，判断你是否已经掌握了足够的信息来回答最终问题。
             2.  **行动**: 如果你需要更多信息，就选择一个最合适的工具（Action）来获取。如果你认为信息已经足够，你的行动就是直接输出最终答案。
 
-            **你可以使用的工具有**:
-            - `search`: 用于进行通用的、开放式的网络搜索。当你需要了解一个概念的背景、定义或查找宽泛信息时使用它。
-            - `rag_search`: 用于进行专业的、深入的知识库检索。当你需要精准的技术细节、行业数据或特定领域的深度原理时使用它。
+            **关键词提取规则**:
+            当你决定使用工具时，你必须从用户问题中提取关键词，而不是传入完整的问题。
+            - 提取1-3个最核心的关键词或短语
+            - 关键词应该是名词、专业术语或核心概念
+            - 多个关键词用空格分隔
+            - 例如："生铁生产过程中的渗碳反应" -> "生铁 渗碳反应"
+            - 例如："机器学习算法的优化方法" -> "机器学习 算法优化"
 
             **你的决策逻辑**:
             - **我是否需要工具?** 如果问题很简单，或者基于历史信息你已经知道了答案，就不要使用任何工具，直接思考并给出最终答案。
-            - **该用哪个工具?** 根据问题的性质，在 `search` 和 `rag_search` 中做出最佳选择。
-            - **我需要多次使用工具吗?** 完全可以！你可能会先用 `search` 获得背景知识，然后根据背景知识，再用 `rag_search` 深入挖掘。这是一个有效的策略。
+            - **该用哪个工具?** 根据问题的性质和可用工具的功能描述，选择最合适的工具来获取信息。
+            - **如何提取关键词?** 仔细分析问题，提取最核心的1-3个关键词或短语作为工具的输入参数。
+            - **我需要多次使用工具吗?** 完全可以！你可能需要使用不同的关键词来获取不同类型的信息，或者多次使用同一工具来深入挖掘。
             - **什么时候停止?** 当你通过思考（Thought）判断，你从工具中获得的观察（Observation）已经足够全面，能够完美回答用户的原始问题时，你就应该停止使用工具，并提供你的最终答案（Final Answer）。
 
-            **重要**: 你的输出必须严格遵循 ReAct 格式，即包含 "Thought:" 和 "Action:"。
+            **重要**: 
+            1. 你的输出必须严格遵循 ReAct 格式，即包含 "Thought:" 和 "Action:"。
+            2. 调用工具时，参数必须是关键词，不是完整问题。
             现在，开始解决问题吧！
             """
 
@@ -106,8 +128,14 @@ class LangGraphReactAgent(BaseAgent):
             
             # 5. 执行 Agent 并获取最终结果
             # 使用非流式输出，直接获取完整的响应结果
+
+            
+            recursion_limit = 10
+            config = {"recursion_limit": recursion_limit}
+
             result = await agent_executor.ainvoke(
-                {"messages": [HumanMessage(content=user_question)]}
+                {"messages": [HumanMessage(content=user_question)]},
+                config=config
             )
             
             # 获取最终响应

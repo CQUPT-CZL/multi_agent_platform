@@ -32,6 +32,90 @@ class LangGraphReactAgent(BaseAgent):
     def description(self) -> str:
         return "一个能自主思考并决定如何使用 Search/RAG 工具的强大代理。"
 
+    async def _create_summary(self, react_messages: List, user_question: str, llm) -> str:
+        """
+        创建总结Agent，分析ReAct Agent的完整对话流程并生成总结
+        """
+        try:
+            # 分析对话历史，提取关键信息
+            conversation_analysis = self._analyze_conversation(react_messages)
+            
+            # 构建总结提示
+            summary_prompt = f"""
+            你是一个专业的流程分析师，需要分析一个AI Agent解决问题的完整过程。
+            
+            **用户原始问题**: {user_question}
+            
+            **Agent执行流程分析**:
+            {conversation_analysis}
+            
+            请根据以上信息，生成一个清晰、结构化的流程总结，包括：
+            
+            1. **问题理解**: 简述Agent如何理解用户问题
+            2. **执行步骤**: 详细描述Agent的每一步操作
+               - 调用了哪些工具
+               - 每次工具调用的目的和结果
+               - Agent的思考过程
+            3. **问题解决**: 说明Agent如何逐步解决问题
+            4. **最终答案**: 总结Agent提供的最终答案
+            
+            请用清晰的中文回答，使用适当的emoji表情符号增强可读性。
+            """
+            
+            # 使用LLM生成总结
+            summary_result = await llm.ainvoke([HumanMessage(content=summary_prompt)])
+            
+            return f"📋 **流程总结**\n\n{summary_result.content}"
+            
+        except Exception as e:
+            print(f"❌ 总结Agent执行失败: {e}")
+            # 如果总结失败，返回原始的最终回答
+            return react_messages[-1].content if react_messages else "❌ 无法生成总结"
+    
+    def _analyze_conversation(self, messages: List) -> str:
+        """
+        分析对话历史，提取工具调用和AI思考过程
+        """
+        analysis_parts = []
+        step_count = 1
+        
+        for i, message in enumerate(messages):
+            if hasattr(message, 'type'):
+                if message.type == 'human':
+                    analysis_parts.append(f"**用户输入**: {message.content}")
+                elif message.type == 'ai':
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        # AI调用工具
+                        for tool_call in message.tool_calls:
+                            tool_name = tool_call.get('name', '未知工具')
+                            tool_args = tool_call.get('args', {})
+                            analysis_parts.append(
+                                f"**步骤 {step_count}**: Agent决定调用工具 `{tool_name}`\n"
+                                f"   - 工具参数: {tool_args}\n"
+                                f"   - 调用原因: 需要获取相关信息来回答问题"
+                            )
+                            step_count += 1
+                    else:
+                        # AI的思考或回答
+                        content = message.content
+                        if content and len(content.strip()) > 0:
+                            if "Thought:" in content or "思考" in content:
+                                analysis_parts.append(f"**步骤 {step_count}**: Agent思考过程\n   - {content[:200]}...")
+                            else:
+                                analysis_parts.append(f"**步骤 {step_count}**: Agent回答\n   - {content[:200]}...")
+                            step_count += 1
+                elif message.type == 'tool':
+                    # 工具返回结果
+                    tool_name = getattr(message, 'name', '未知工具')
+                    tool_content = message.content[:200] if message.content else "无返回内容"
+                    analysis_parts.append(
+                        f"**步骤 {step_count}**: 工具 `{tool_name}` 返回结果\n"
+                        f"   - 结果摘要: {tool_content}..."
+                    )
+                    step_count += 1
+        
+        return "\n\n".join(analysis_parts) if analysis_parts else "无法分析对话流程"
+
     def _load_mcp_config(self) -> Dict[str, Any]:
         """
         从 config.json 文件加载 MCP 配置
@@ -139,13 +223,19 @@ class LangGraphReactAgent(BaseAgent):
                 config=config
             )
             
-            # 获取最终响应
-            final_response = result["messages"][-1].content
+            # 获取ReAct Agent的完整对话历史
+            react_messages = result["messages"]
             
-            print("✅ Workflow finished.")
-            print("Final Response:", final_response)
+            print("✅ ReAct Workflow finished.")
+            print("Starting Summary Agent...")
+            
+            # 创建总结Agent
+            summary_response = await self._create_summary(react_messages, user_question, llm)
+            
+            print("✅ Summary Agent finished.")
+            print("Final Summary:", summary_response)
 
-            return final_response
+            return summary_response
 
         except Exception as e:
             import traceback

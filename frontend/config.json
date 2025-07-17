@@ -1,6 +1,10 @@
 {
   "rag": {
-    "url": "http://113.249.91.68:5903/mcp/",
+    "url": "http://113.249.91.68:8007/mcp/",
+    "transport": "streamable_http"
+  },
+  "search": {
+    "url": "http://127.0.0.1:8006/mcp/",    
     "transport": "streamable_http"
   }
 }

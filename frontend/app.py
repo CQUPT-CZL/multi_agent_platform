@@ -6,6 +6,245 @@ import json
 import os
 from auth import check_authentication, render_login_page, render_user_info, check_login_required
 
+# 设置页面配置
+st.set_page_config(
+    page_title="Multi-Agent 测试平台",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 自定义CSS样式
+st.markdown("""
+<style>
+    /* 主题色彩 */
+    :root {
+        --primary-color: #667eea;
+        --secondary-color: #764ba2;
+        --accent-color: #f093fb;
+        --success-color: #4CAF50;
+        --warning-color: #ff9800;
+        --error-color: #f44336;
+        --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --border-radius: 12px;
+    }
+    
+    /* 隐藏Streamlit默认元素 */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* 主容器样式 */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 100%;
+    }
+    
+    /* 侧边栏美化 */
+    .css-1d391kg {
+        background: var(--background-gradient);
+        border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    }
+    
+    /* 标题样式 */
+    .main-title {
+        background: var(--background-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 3rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 1rem;
+        animation: fadeInDown 1s ease-out;
+    }
+    
+    /* 配置卡片样式 */
+    .config-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        border-left: 4px solid var(--primary-color);
+        margin-bottom: 1rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .config-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* 状态指示器 */
+    .status-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-online {
+        background-color: var(--success-color);
+    }
+    
+    .status-offline {
+        background-color: var(--error-color);
+    }
+    
+    /* 按钮美化 */
+    .stButton > button {
+        background: var(--background-gradient);
+        color: white;
+        border: none;
+        border-radius: var(--border-radius);
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: var(--card-shadow);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 聊天消息样式 */
+    .stChatMessage {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        margin-bottom: 1rem;
+        animation: slideInUp 0.5s ease-out;
+    }
+    
+    /* 输入框样式 */
+    .stTextInput > div > div > input {
+        border-radius: var(--border-radius);
+        border: 2px solid #e0e0e0;
+        transition: border-color 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* 选择框样式 */
+    .stSelectbox > div > div {
+        border-radius: var(--border-radius);
+    }
+    
+    /* 进度条样式 */
+    .stProgress > div > div > div {
+        background: var(--background-gradient);
+        border-radius: var(--border-radius);
+    }
+    
+    /* 成功/错误消息样式 */
+    .stSuccess {
+        background-color: rgba(76, 175, 80, 0.1);
+        border-left: 4px solid var(--success-color);
+        border-radius: var(--border-radius);
+    }
+    
+    .stError {
+        background-color: rgba(244, 67, 54, 0.1);
+        border-left: 4px solid var(--error-color);
+        border-radius: var(--border-radius);
+    }
+    
+    .stWarning {
+        background-color: rgba(255, 152, 0, 0.1);
+        border-left: 4px solid var(--warning-color);
+        border-radius: var(--border-radius);
+    }
+    
+    .stInfo {
+        background-color: rgba(102, 126, 234, 0.1);
+        border-left: 4px solid var(--primary-color);
+        border-radius: var(--border-radius);
+    }
+    
+    /* 动画效果 */
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        .main-title {
+            font-size: 2rem;
+        }
+        
+        .config-card {
+            padding: 1rem;
+        }
+    }
+    
+    /* 工具提示样式 */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: white;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # =============================================================================
 # 0. MCP配置管理
 # =============================================================================
@@ -107,12 +346,7 @@ def get_backend_config():
 # =============================================================================
 # 3. 页面基础设置和Session State初始化
 # =============================================================================
-# 配置浏览器标签页的标题、图标和页面布局
-st.set_page_config(
-    page_title="多 Agent 框架对比平台",
-    page_icon="🤖",
-    layout="wide"
-)
+# 页面配置已在文件开头设置
 
 # =============================================================================
 # 用户认证检查
@@ -148,7 +382,7 @@ if "mcp_config_initialized" not in st.session_state:
 # =============================================================================
 # 使用 'with' 语句将所有元素放入侧边栏
 with st.sidebar:
-    st.title("🛠️ 配置中心")
+    # st.markdown('<div class="config-card"><h2 style="margin:0; color: black; text-align: center;">🛠️ 配置中心</h2></div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -181,12 +415,13 @@ with st.sidebar:
         st.stop()
 
     # 如果成功，显示一个友好的成功状态
+    st.markdown('<div class="status-indicator status-online"></div>**后端连接状态**: 已连接', unsafe_allow_html=True)
     st.success("✅ 已成功从后端加载配置！")
     st.markdown("---")
 
     # ---- 动态生成选择器 ----
 
-    st.subheader("🤖 Agent配置")
+    st.markdown('<div class="config-card"><h3 style="margin:0; color: #667eea;">🤖 Agent配置</h3></div>', unsafe_allow_html=True)
     # 1. Agent框架选择器
     # 选项的 keys 直接来自后端返回的 JSON 数据
     framework_options = list(backend_config.keys())
@@ -241,7 +476,7 @@ with st.sidebar:
     # =============================================================================
     # MCP工具配置部分
     # =============================================================================
-    st.subheader("🔧 MCP工具配置")
+    st.markdown('<div class="config-card"><h3 style="margin:0; color: #667eea;">🔧 MCP工具配置</h3></div>', unsafe_allow_html=True)
     
     # MCP工具添加界面
     with st.expander("🧰 添加MCP工具", expanded=st.session_state.mcp_tools_expander):
@@ -420,7 +655,7 @@ with st.sidebar:
     
     # 历史会话管理（仅在用户登录时显示）
     if check_login_required() and check_authentication():
-        st.subheader("💬 会话管理")
+        st.markdown('<div class="config-card"><h3 style="margin:0; color: #667eea;">💬 会话管理</h3></div>', unsafe_allow_html=True)
         
         # 获取当前用户名和认证管理器
         username = st.session_state.get("username")
@@ -501,7 +736,7 @@ with st.sidebar:
     # =============================================================================
     # 操作按钮
     # =============================================================================
-    st.subheader("🔄 操作")
+    st.markdown('<div class="config-card"><h3 style="margin:0; color: #667eea;">🔄 操作</h3></div>', unsafe_allow_html=True)
     
     # 刷新按钮，用于清除缓存并重新从后端拉取配置
     if st.button("🔄 刷新配置", use_container_width=True):
@@ -533,10 +768,37 @@ with st.sidebar:
 # =============================================================================
 # 5. 主聊天界面
 # =============================================================================
-st.title("multi-Agent 测试平台 🚀")
-# 在标题下方显示当前用户的选择，非常直观
+# 使用自定义样式的标题
+st.markdown('<h1 class="main-title">🚀 Multi-Agent 测试平台</h1>', unsafe_allow_html=True)
+
+# 在标题下方显示当前用户的选择，使用美化的配置卡片
 mcp_tool_count = len(st.session_state.current_mcp_config) if "current_mcp_config" in st.session_state else 0
-st.caption(f"当前配置:  `{selected_framework}`  >  `{selected_agent_name}`  >  `{selected_model}`  |  🔧 MCP工具: {mcp_tool_count}个")
+
+# 创建配置状态卡片
+config_html = f"""
+<div class="config-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 2rem;">
+    <h3 style="margin: 0 0 1rem 0; color: white;">📊 当前配置状态</h3>
+    <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.9rem; opacity: 0.8;">Agent框架</div>
+            <div style="font-size: 1.1rem; font-weight: 600;">{selected_framework}</div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.9rem; opacity: 0.8;">Agent名称</div>
+            <div style="font-size: 1.1rem; font-weight: 600;">{selected_agent_name}</div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.9rem; opacity: 0.8;">模型</div>
+            <div style="font-size: 1.1rem; font-weight: 600;">{selected_model}</div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.9rem; opacity: 0.8;">MCP工具</div>
+            <div style="font-size: 1.1rem; font-weight: 600;">{mcp_tool_count} 个</div>
+        </div>
+    </div>
+</div>
+"""
+st.markdown(config_html, unsafe_allow_html=True)
 
 # ---- 核心聊天逻辑 ----
 
@@ -553,7 +815,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # 接收用户的新输入
-if prompt := st.chat_input("请输入您的问题或指令..."):
+if prompt := st.chat_input("💭 请输入您的问题或指令..."):
     # 确保有当前会话（如果用户登录了）
     if check_login_required() and check_authentication():
         username = st.session_state.get("username")
@@ -591,9 +853,32 @@ if prompt := st.chat_input("请输入您的问题或指令..."):
 
     # 2. 调用后端 API 并显示 Agent 的响应
     with st.chat_message("assistant"):
-        # 使用一个占位符，可以先显示"思考中"，然后用真实响应覆盖它
+        # 使用美化的思考中提示
         message_placeholder = st.empty()
-        message_placeholder.markdown("🧠 Agent 正在思考中，请稍候...")
+        thinking_html = """
+        <div style="
+            padding: 1.5rem;
+            border-radius: 12px; 
+            text-align: center;
+            animation: pulse 2s infinite;
+        ">
+            <div style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+                正在分析您的问题并生成回答
+            </div>
+            <div>
+                <div style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; 
+                    background: #667eea; margin: 0 2px; animation: pulse 1.5s infinite;">
+                </div>
+                <div style="display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                    background: #667eea; margin: 0 2px; animation: pulse 1.5s infinite 0.2s;">
+                </div>
+                <div style="display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                    background: #667eea; margin: 0 2px; animation: pulse 1.5s infinite 0.4s;">
+                </div>
+            </div>
+        </div>
+        """
+        message_placeholder.markdown(thinking_html, unsafe_allow_html=True)
         
         try:
             # 准备发送给后端 /chat 接口的数据
@@ -614,14 +899,50 @@ if prompt := st.chat_input("请输入您的问题或指令..."):
             # 处理响应
             if response.status_code == 200:
                 agent_response = response.json().get("response", "抱歉，收到了一个空的响应。")
+                # 直接显示响应内容，不使用HTML包装
+                message_placeholder.markdown(agent_response)
             else:
+                # 美化错误响应
+                error_html = f"""
+                <div style="
+                    padding: 1.5rem;
+                    background: rgba(244, 67, 54, 0.1);
+                    border-radius: 12px;
+                    border-left: 4px solid #f44336;
+                    margin: 1rem 0;
+                ">
+                    <div style="color: #f44336; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center;">
+                        <span style="margin-right: 0.5rem;">❌</span>
+                        API 调用失败
+                    </div>
+                    <div style="color: #666; margin-bottom: 0.5rem;"><strong>状态码:</strong> {response.status_code}</div>
+                    <div style="color: #666;"><strong>错误信息:</strong> {response.text}</div>
+                </div>
+                """
+                message_placeholder.markdown(error_html, unsafe_allow_html=True)
                 agent_response = f"❌ **API 调用失败**\n\n- **状态码**: {response.status_code}\n- **错误信息**: {response.text}"
         
         except requests.exceptions.RequestException as e:
+            # 美化网络错误
+            error_html = f"""
+            <div style="
+                padding: 1.5rem;
+                background: rgba(244, 67, 54, 0.1);
+                border-radius: 12px;
+                border-left: 4px solid #f44336;
+                margin: 1rem 0;
+            ">
+                <div style="color: #f44336; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center;">
+                    <span style="margin-right: 0.5rem;">🌐</span>
+                    网络请求失败
+                </div>
+                <div style="color: #666; margin-bottom: 0.5rem;"><strong>错误类型:</strong> {type(e).__name__}</div>
+                <div style="color: #666; margin-bottom: 1rem;"><strong>详情:</strong> {str(e)}</div>
+                <div style="color: #888; font-size: 0.9rem; font-style: italic;">请检查您的网络连接以及后端服务是否正常。</div>
+            </div>
+            """
+            message_placeholder.markdown(error_html, unsafe_allow_html=True)
             agent_response = f"❌ **网络请求失败**\n\n- **错误类型**: {type(e).__name__}\n- **详情**: {str(e)}\n\n请检查您的网络连接以及后端服务是否正常。"
-        
-        # 更新占位符为最终的响应
-        message_placeholder.markdown(agent_response)
         
         # 3. 将 Agent 的完整响应也添加到聊天记录中
         st.session_state.messages.append({"role": "assistant", "content": agent_response})
